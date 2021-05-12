@@ -21,17 +21,21 @@ shinyServer(function(input,output) {
                skip = input$row)
   })
   
-  #trapezoid<-reactive({
-  #  file1=input$file
-  #  if(is.null(file1)){return()}
-  #  a=datareading()[,2][10:20]
-  #  h=datareading()[,1][10:20]
-  #  S=numeric(length(h)-1)
-  #  for(t in 1 : (length(h))) {
-  #    S[t]=(a()[t]+a()[t+1])*(h()[t+1]-h()[t])/2
-  #  }
-  #  return(S)
-  #})
+  trapezoid<-reactive({
+    file1=input$file
+    if(is.null(file1)){return()}
+    ti=function(Fi){
+      a=Fi[,2][input$range[1]:input$range[2]]
+      h=Fi[,1][input$range[1]:input$range[2]]
+      S=numeric(length(h)-1)
+      for(t in 1 : length(h)) {
+        S[t]=(a[t]+a[t+1]-2*(mean(sort(na.omit(a))[1:10])+3*sd(sort(na.omit(a))[1:10])))*(h[t+1]-h[t])/2
+      }
+      return(sum(na.omit(S[-which(S<0)])))
+    }
+    return(ti(datareading()))
+  })
+  
   
   output$filedf <- renderTable({
     if(is.null(input$file)){return ()}
@@ -115,10 +119,10 @@ shinyServer(function(input,output) {
     
   })
   
-  #output$selectedarea<-renderText({
-  #  if(is.null(input$file)){return()}
-  #  paste("Integral area of range you select is:",trapezoid())
-  #})
+  output$selectedarea<-renderText({
+    if(is.null(input$file)){return()}
+    paste("Integral area of range you select is:",trapezoid())
+  })
   
   
   ## MainPanel tabset renderUI code ##
@@ -134,11 +138,10 @@ shinyServer(function(input,output) {
         tabPanel("Summary Stats", verbatimTextOutput("summ")),
         tabPanel("Scatter diagram of the selected element", 
                  verticalLayout(mainPanel(plotOutput("scatter")),
-                                mainPanel(plotOutput("inte"))
-                                # mainPanel(textOutput("selectedarea"))
+                                mainPanel(plotOutput("inte")),
+                                mainPanel(textOutput("selectedarea"))
                  ))
       )
   })
 })
-
 
