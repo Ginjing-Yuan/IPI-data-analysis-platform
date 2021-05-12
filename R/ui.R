@@ -12,7 +12,9 @@ shinyUI(fluidPage(
       numericInput(inputId = 'row',label = 'The number of row you need to skip',1),
       uiOutput("selectfile"),
       uiOutput("selectelement"),
-      uiOutput("selectrange")
+      uiOutput("selectrange"),
+      uiOutput("manual_integral"),
+      uiOutput("manual_integral_slider_tailing_problems")
     ),
     mainPanel(
       uiOutput("tb")
@@ -21,3 +23,4 @@ shinyUI(fluidPage(
     
   )
 ))
+

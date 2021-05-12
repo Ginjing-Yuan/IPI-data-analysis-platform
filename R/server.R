@@ -25,17 +25,16 @@ shinyServer(function(input,output) {
     file1=input$file
     if(is.null(file1)){return()}
     ti=function(Fi){
-      a=Fi[,2][input$range[1]:input$range[2]]
+      a=Fi[,input$Substances][input$range[1]:input$range[2]]
       h=Fi[,1][input$range[1]:input$range[2]]
       S=numeric(length(h)-1)
       for(t in 1 : length(h)) {
-        S[t]=(a[t]+a[t+1]-2*(mean(sort(na.omit(a))[1:10])+3*sd(sort(na.omit(a))[1:10])))*(h[t+1]-h[t])/2
+        S[t]=(a[t]+a[t+1])*(h[t+1]-h[t])/2
       }
-      return(sum(na.omit(S[-which(S<0)])))
+      return(sum(na.omit(S)))
     }
     return(ti(datareading()))
   })
-  
   
   output$filedf <- renderTable({
     if(is.null(input$file)){return ()}
@@ -53,6 +52,7 @@ shinyServer(function(input,output) {
     if(is.null(input$file)){return ()}
     str(input$file)
   })
+  
   
   # Following code displays the select input widget with the list of file loaded by the user
   output$selectfile <- renderUI({
@@ -76,10 +76,32 @@ shinyServer(function(input,output) {
     if(is.null(input$file)) {return()}
     list(hr(), 
          helpText("Select the the range you need to integral"),
-         sliderInput("range","Range of integral",1,length(datareading()[,1]),
+         sliderInput("range","Range of baseline integral",1,length(datareading()[,1]),
                      c(length(datareading()[,1])/length(datareading()[,1]),length(datareading()[,1])/2),step = 1)
     )
   })
+  
+  output$manual_integral<-renderUI({
+    if(is.null(input$file)) {return()}
+    list(hr(), 
+         helpText("Do you want to integrate it manually?"),
+         selectInput("manual", "manual integration", choices=c("No"="N","Yes"="Y"))
+    )
+  })
+  
+  output$manual_integral_slider_tailing_problems<-renderUI({
+    if(is.null(input$file)){return()}
+    if(input$manual == "N") {return()}
+    list(hr(), 
+         helpText("Select the the range you need to integral manually"),
+         selectInput("integration_methods","Which problem does this figure have?",choices=c("Tailing"="T","Double peak"="D")),
+         sliderInput("manual_range","Range of manual integral for tailing problem",1,length(datareading()[,1]),
+                     c(length(datareading()[,1])/length(datareading()[,1]),length(datareading()[,1])/2),step = 1)
+    )
+  })
+  
+  
+  
   
   
   ## Summary Stats code ##
@@ -103,25 +125,102 @@ shinyServer(function(input,output) {
       geom_line(aes(datareading()[,1],y=getBaseline(baseline(matrix(get(input$Substances), nrow = 1)))))+
       xlab("Time (s)")+
       theme(axis.title.x = element_text(size = 20),axis.title.y = element_text(size = 20),
-            axis.text.x = element_text(size = 14),axis.text.y = element_text(size = 14))
+            axis.text.x = element_text(size = 14),axis.text.y = element_text(size = 14))+
+      ylab(input$Substances)
     
   })
   
   output$inte<-renderPlot({
     if(is.null(input$file)){return()}
-    ggplot(datareading()[input$range[1]:input$range[2],],aes(datareading()[input$range[1]:input$range[2],][,1],y= get(input$Substances)))+
-      geom_point()+
-      xlab("Time (s)")+
-      geom_area(aes(),fill="red")+
-      scale_x_continuous(limits=c(0, max(datareading()[,1])))+
-      theme(axis.title.x = element_text(size = 20),axis.title.y = element_text(size = 20),
-            axis.text.x = element_text(size = 14),axis.text.y = element_text(size = 14))
+    if(input$manual == "N") {
+      ggplot(datareading()[input$range[1]:input$range[2],],aes(datareading()[input$range[1]:input$range[2],][,1],y= get(input$Substances)))+
+        geom_point(aes(),size=0.5)+
+        xlab("Time (s)")+
+        geom_area(aes(),fill="red",alpha=0.5)+
+        scale_x_continuous(limits=c(0, max(datareading()[,1])))+
+        theme(axis.title.x = element_text(size = 20),axis.title.y = element_text(size = 20),
+              axis.text.x = element_text(size = 14),axis.text.y = element_text(size = 14))+
+        ylab(input$Substances)
+    }else{
+      if(input$integration_methods=="D"){
+        ggplot(datareading()[input$range[1]:input$range[2],],aes(datareading()[input$range[1]:input$range[2],][,1],y= get(input$Substances)))+
+          geom_point(aes(),size=0.5)+
+          xlab("Time (s)")+
+          geom_area(aes(),fill="red",alpha=0.5)+
+          scale_x_continuous(limits=c(0, max(datareading()[,1])))+
+          theme(axis.title.x = element_text(size = 20),axis.title.y = element_text(size = 20),
+                axis.text.x = element_text(size = 14),axis.text.y = element_text(size = 14))+
+          geom_segment(aes(x=datareading()[,1][input$manual_range[1]],xend=datareading()[,1][input$manual_range[2]],
+                           y=datareading()[,input$Substances][input$manual_range[1]],yend=datareading()[,input$Substances][input$manual_range[1]]))+
+          geom_segment(aes(x=datareading()[,1][input$manual_range[2]],xend=datareading()[,1][input$manual_range[2]],
+                           y=datareading()[,input$Substances][input$manual_range[1]],yend=datareading()[,input$Substances][input$manual_range[2]]))+
+          ylab(input$Substances)
+      }else{
+      #df=data.frame(t=c(datareading()[,1][input$manual_range[1]],datareading()[,1][input$manual_range[2]]),
+      #element=c(datareading()[,input$Substances][input$manual_range[1]],datareading()[,input$Substances][input$manual_range[2]]))
+      #lm=lm(element~t,df)
+      ggplot(datareading()[input$range[1]:input$range[2],],aes(datareading()[input$range[1]:input$range[2],][,1],y= get(input$Substances)))+
+        geom_point(aes(),size=0.5)+
+        xlab("Time (s)")+
+        geom_area(aes(),fill="red",alpha=0.5)+
+        scale_x_continuous(limits=c(0, max(datareading()[,1])))+
+        theme(axis.title.x = element_text(size = 20),axis.title.y = element_text(size = 20),
+              axis.text.x = element_text(size = 14),axis.text.y = element_text(size = 14))+
+        geom_segment(aes(x=datareading()[,1][input$manual_range[1]],xend=datareading()[,1][input$manual_range[2]],
+                         y=datareading()[,input$Substances][input$manual_range[1]],yend=datareading()[,input$Substances][input$manual_range[2]]))+
+        ylab(input$Substances)
+      #geom_abline(aes(intercept = lm$coefficients[1],slope = lm$coefficients[2]), size=1, alpha=0.5)
+      }
+    }
     
   })
+  
   
   output$selectedarea<-renderText({
     if(is.null(input$file)){return()}
     paste("Integral area of range you select is:",trapezoid())
+  })
+  
+  manual_tropezoid_tailing<-reactive({
+    file1=input$file
+    if(is.null(file1)){return()}
+    ti=function(Fi){
+      a=c(Fi[,input$Substances][input$manual_range[1]],Fi[,input$Substances][input$manual_range[2]])
+      h=c(Fi[,1][input$manual_range[1]],Fi[,1][input$manual_range[2]])
+      S=numeric(1)
+      S=(a[1]+a[2])*(h[2]-h[1])/2
+      
+      return(sum(na.omit(S)))
+    }
+    return(ti(datareading()))
+  })
+  
+  manual_tropezoid_doublepeak<-reactive({
+    file1=input$file
+    if(is.null(file1)){return()}
+    ti=function(Fi){
+      a=c(Fi[,input$Substances][input$manual_range[1]],Fi[,input$Substances][input$manual_range[2]])
+      h=c(Fi[,1][input$manual_range[1]],Fi[,1][input$manual_range[1]])
+      S=numeric(1)
+      S=(a[1]+a[2])*(h[2]-h[1])/2
+      
+      return(sum(na.omit(S)))
+    }
+    return(ti(datareading()))
+  })
+  
+  output$manual_selectedarea<-renderText({
+    if(is.null(input$file)){return()}
+    if(input$manual == "N"){return()}
+    else{
+      if(input$integration_methods=="D"){
+        paste("Manual integral area of range you select is:",trapezoid()-manual_tropezoid_doublepeak())
+      }
+      else{
+        paste("Manual integral area of range you select is:",trapezoid()-manual_tropezoid_tailing())
+      }
+    }
+    
   })
   
   
@@ -139,7 +238,8 @@ shinyServer(function(input,output) {
         tabPanel("Scatter diagram of the selected element", 
                  verticalLayout(mainPanel(plotOutput("scatter")),
                                 mainPanel(plotOutput("inte")),
-                                mainPanel(textOutput("selectedarea"))
+                                mainPanel(h3(textOutput("selectedarea"))),
+                                mainPanel(h3(textOutput("manual_selectedarea")))
                  ))
       )
   })
